@@ -1,0 +1,8 @@
+node_modules/
+coverage/
+*.tgz
+__pycache__/
+*.pyc
+.saved-*.tmp
+saved.json
+write.lock/
