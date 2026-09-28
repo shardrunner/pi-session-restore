@@ -35,8 +35,11 @@ needed for the extension itself; it uses Node built-ins and Pi's extension API.
 Keep the checkout at the registered location. Do not also install a second copy
 under Pi's auto-discovered extension directory.
 
-Once hosted, Pi also supports installing a GitHub repository using
-`pi install git:github.com/OWNER/REPOSITORY@TAG`.
+Or install directly from GitHub:
+
+```bash
+pi install git:github.com/shardrunner/pi-session-restore
+```
 
 ## Use
 
