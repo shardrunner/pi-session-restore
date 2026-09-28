@@ -11,7 +11,7 @@ restoration, no daemon, and no model calls.
 ## Requirements
 
 - Linux, GNU `env` with `--chdir`, and `pi` available on `PATH`.
-- Requires Pi **0.86.1+**; development dependencies pin **0.86.1**. Newer versions are intended targets, not a guarantee against upstream API changes.
+- Requires Pi **0.87.1+**; development dependencies pin **0.87.1**. Newer versions are intended targets, not a guarantee against upstream API changes.
 - Node **24+** for development; CI checks Node 24 and 26.
 - A desktop terminal capable of executing an argument vector in a new window.
 - **Persistent global installation** of this extension in the same Pi agent directory.
