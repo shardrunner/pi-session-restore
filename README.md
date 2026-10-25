@@ -1,5 +1,7 @@
 # Pi Session Restore
 
+> **Disclaimer:** This extension is vibe coded. Use at your own risk.
+
 Bookmark [Pi](https://pi.dev) conversations and reopen them in separate terminal
 windows, with cross-process claim protection and startup acknowledgement.
 
