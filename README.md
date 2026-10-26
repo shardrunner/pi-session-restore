@@ -1,88 +1,73 @@
-# Pi Session Restore
+# pi-session-restore
 
 > **Disclaimer:** This extension is vibe coded for personal use. Use at your own risk.
 
-Keep a queue of [Pi](https://pi.dev) conversations to reopen later, one per new
-terminal window. Use `/save "Fix login"` to bookmark a conversation and exit,
-then `/restore` from another Pi instance to reopen it. Cross-process claims and
-startup acknowledgement coordinate restore requests.
+Keep a list of [Pi](https://pi.dev) conversations to come back to later, and reopen
+each one in its own terminal window.
 
-Pi's `/resume` switches the conversation in the current instance. This extension
-keeps an explicit queue of conversations you want to reopen later, one per new
-window. It is a small, opinionated Linux desktop tool: manual saving, manual
-restoration, no daemon, and no model calls.
+A small Linux desktop tool with no background service and no model calls.
 
-## Requirements
+## Why
 
-- Linux, GNU `env` with `--chdir`, and `pi` available on `PATH`.
-- Requires Pi **0.87.1+**; development dependencies pin **0.87.1**. Newer versions are intended targets, not a guarantee against upstream API changes.
-- Node **24+** for development; CI checks Node 24 and 26.
-- A desktop terminal capable of executing an argument vector in a new window.
-- **Persistent global installation** of this extension in the same Pi agent directory.
+- When you juggle several conversations, closing terminals means losing track of which ones still need work.
+- Pi's `/resume` lists all saved sessions and switches the current window. It doesn't keep a short list of the ones you meant to come back to, or open them in separate windows.
 
-macOS, Windows, project-only installations, and temporary `pi -e` loading are not
-supported restore configurations. A child starts plain `pi`, so it must discover
-the extension globally to acknowledge its ticket. Custom Pi startup flags and
-project-specific extension configuration are not copied from the original process.
+## Features
 
-## Install
+- `/save "Fix login"` saves a reference to the conversation and exits Pi.
+- `/restore` reopens one or all saved conversations in new terminal windows, each in its
+  original working directory.
+- An entry is only marked as restored once the new Pi instance confirms it started with
+  the right session and launch ticket.
+- Safe when several Pi processes run at once: changes are locked, written atomically and
+  tied to a single launch ticket.
+- Any terminal that can run a command in a new window works (`xdg-terminal-exec`, foot,
+  kitty, GNOME Terminal and others).
 
-Clone this repository, then register its directory globally:
+## Installation
 
-```bash
-cd /path/to/pi-session-restore
-pi install "$PWD"
-```
+Requirements:
 
-Run `/reload` in existing Pi instances. No runtime dependency installation is
-needed for the extension itself; it uses Node built-ins and Pi's extension API.
-Keep the checkout at the registered location. Do not also install a second copy
-under Pi's auto-discovered extension directory.
+- Linux, GNU `env` with `--chdir` and `pi` on `PATH`
+- **Pi 0.87.1+** and **Node.js 24+**, with this extension **installed globally** in the same Pi agent directory
+- A terminal that can run a command in a new window
 
-Or install directly from GitHub:
+The new window starts plain `pi`, so the extension has to be installed globally to
+confirm the restore. macOS, Windows, project-only installs and temporary `pi -e`
+loading are not supported.
 
-```bash
+```sh
 pi install git:github.com/shardrunner/pi-session-restore
 ```
 
-## Use
+Run `/reload` in open Pi sessions. Update with `pi update --extensions`.
+For local development, install a checkout instead (`pi install "$PWD"` from the clone)
+and keep it at that location. Don't also put a copy in Pi's auto-discovered extensions
+directory. No runtime dependencies, no build step.
 
-In a conversation with persisted history:
-
-```text
-/save "Fix login"
-```
-
-Pi exits automatically after a successful save; a failed save leaves it open.
-From another Pi instance:
+## Usage
 
 ```text
-/restore
+/save "Fix login"     # in the conversation you want to come back to; Pi exits
+/restore              # from any other Pi instance
 ```
 
-Choose the conversation or **Restore all pending**. Each starts in its saved
-working directory. A record disappears from the picker only after the child Pi
-instance acknowledges the exact session and launch ticket.
+| Command                          | Purpose                                                                                                                         |
+| -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| `/save [label]`                  | Save or update the current conversation's reference, then exit. Default label: session name, else directory and time.           |
+| `/restore`                       | Open a saved conversation, all pending ones, or reset a launch that never confirmed. Never relaunches the current conversation. |
+| `/restore-forget`                | Remove a saved reference after confirmation. Conversation files are never deleted.                                              |
+| `/restore-status`                | Show where state is stored, session paths, launch times and the command that would be run.                                      |
+| `/restore-terminal [JSON array]` | Show or set the terminal command prefix.                                                                                        |
 
-| Command                          | Purpose                                                                                                                          |
-| -------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
-| `/save [label]`                  | Save or replace the current conversation's reference, then exit Pi. Default label: session name, then directory and timestamp.   |
-| `/restore`                       | Open pending conversations or reset uncertain launches. Never launch the current conversation.                                   |
-| `/restore-forget`                | Forget any saved reference, including restored or missing sessions. Confirmation required; conversation files are never deleted. |
-| `/restore-status`                | Show state location, session paths, launch timestamps/age, and diagnostic argument vectors.                                      |
-| `/restore-terminal [JSON array]` | Show or configure the terminal command prefix.                                                                                   |
-
-Re-saving the same session replaces its previous reference (matched by session ID,
-not label), updates its label, and makes it pending again without creating a duplicate.
-Labels need not be unique. Saving is **not a snapshot or backup**: it remembers
-the latest persisted conversation in the original session file. It does not
-preserve terminal scrollback, running tools, editor drafts, or window placement.
-A brand-new conversation may not have a persisted file yet.
+Saving the same session again replaces its entry and marks it pending. Saving keeps a
+**reference, not a snapshot**: it doesn't preserve scrollback, running tools, editor
+drafts or window placement. A brand-new conversation may not have a session file yet.
 
 ### Terminal configuration
 
-Use `xdg-terminal-exec` automatically when available. Otherwise, the first restore
-asks you to select an installed terminal and remembers your choice.
+The extension uses `xdg-terminal-exec` when it's available. Otherwise the first
+`/restore` asks you to choose an installed terminal and remembers it:
 
 ```text
 /restore-terminal ["foot"]
@@ -90,83 +75,14 @@ asks you to select an installed terminal and remembers your choice.
 /restore-terminal ["gnome-terminal", "--window", "--"]
 ```
 
-Candidates also include Alacritty, WezTerm, Konsole, and Xterm. The prefix must
-open a **new window** and execute the appended arguments literally, not interpret
-them as a shell command. Your terminal's configuration can affect window reuse.
-Candidate prefixes are not a claim of automated desktop compatibility testing.
-
-The appended command is an argument vector equivalent to:
+The prefix must open a **new window** and run the appended arguments as-is, without
+passing them through a shell:
 
 ```text
 env --chdir <cwd> PI_CODING_AGENT_DIR=<agent-directory> pi --session <file> --saved-session-ticket <ticket>
 ```
 
-No shell interpolation and no prompt are involved. The agent directory is passed
-explicitly through terminal-server boundaries. `pi` and `env` must also be
-resolvable in the terminal's execution environment.
-
-## Recovery and diagnostics
-
-**A spawned launcher is not a restored session.** If a terminal starts but cannot
-execute Pi, the saved entry stays `launching`.
-
-1. Check for a startup/trust dialog in the new terminal.
-2. Use `/restore-status` to inspect the state path, launch age and command arguments.
-   The displayed vector uses the **current** terminal configuration; it is not a
-   historical execution log. Do not execute it again while a launch is uncertain.
-3. Close any corresponding terminal before selecting the awaiting-startup entry
-   in `/restore` and confirming reset.
-4. Invoke `/restore` again to retry. Reset alone never launches a window.
-
-The current conversation is excluded from launch actions, but its uncertain
-launch can still be reset. A stale confirmation cannot invalidate a newer ticket.
-Forgetting an uncertain launch also invalidates its ticket.
-
-Missing files and directories produce errors without consuming the entry. Use
-`/restore-forget` to remove obsolete references. Restored references remain stored
-until explicitly forgotten.
-
-### State and locking
-
-State lives outside the source tree:
-
-```text
-~/.pi/agent/session-restore/saved.json
-```
-
-`PI_CODING_AGENT_DIR` overrides the agent directory. New state directories are
-0700 and files are 0600. Existing directory permissions are not changed.
-
-An interrupted write can leave an empty `write.lock` directory. After a bounded
-two-second wait, commands report its path. **Only after checking that no save or
-restore operation is running**, remove that empty directory with `rmdir` and
-retry. Never force-remove a potentially active lock. Failed cleanup may also
-leave a `.saved-*.tmp` file; preserve it if investigating a failed write.
-
-Malformed state fails visibly and is never silently replaced. Back up the file
-before manually repairing it. Earlier unpublished prototype state is not a
-supported compatibility contract: launching entries must have a nonempty ticket
-and valid `launchedAt`; restored entries require `restoredAt`. Do not fabricate a
-new ticket to recover an uncertain launch.
-
-### Safety boundaries
-
-- Close original instances before restoring their conversations. This extension
-  coordinates **its own restore requests**, not arbitrary Pi processes writing
-  the same session. It is not a general session lock.
-- Invalid/expired tickets cause the child Pi to request shutdown. Pi may already
-  have written startup metadata before the extension receives `session_start`;
-  rejection is not a byte-for-byte read-only open.
-- Other installed extensions retain their normal startup behavior and permissions.
-- State and diagnostic output include labels, absolute paths and launch tickets.
-  Do not publish them. Conversation contents are not copied into saved state.
-- Custom terminal prefixes execute with your permissions. Configure only trusted
-  executables. Argument-vector handling does not sandbox the chosen executable.
-- Atomic rename prevents partial JSON reads, but is not a power-loss durability
-  guarantee or a backup. The lock assumes a local filesystem with normal atomic
-  directory creation and rename semantics.
-
-## Engineering decisions
+## Design
 
 ```text
 /save → pending → claim a unique ticket → launching
@@ -176,52 +92,77 @@ restored → /save → pending
 any saved entry → confirmed forget → reference removed
 ```
 
-- **Acknowledgement instead of optimistic success:** terminal launchers and servers
-  can succeed while the intended command fails.
-- **Exclusive claims:** a directory lock serializes read-modify-write operations
-  across Pi processes. Writes use a private temporary file and atomic rename.
-- **Ticket-scoped transitions:** delayed acknowledgements and stale confirmations
-  cannot consume or reset a different launch.
-- **No automatic timeout retries:** a slow launch may still succeed; reopening it
-  automatically risks two writers. Recovery deliberately requires a human decision.
-- **Minimal architecture:** `core.ts` owns validation, storage and transitions;
-  `index.ts` owns commands, dialogs and process launching. No runtime dependencies,
-  polling, watchers, model tools, or background resources during ordinary startup.
+- **Wait for confirmation:** a terminal can open successfully while the command inside
+  it fails, so an entry only counts as restored once the new Pi instance confirms it.
+- **Exclusive claims:** a directory lock serializes changes across Pi processes, and
+  writes go to a private temporary file followed by an atomic rename. This assumes a
+  local filesystem with atomic directory creation and rename.
+- **Ticket-scoped changes:** late confirmations and old reset requests can't affect a
+  different launch.
+- **No automatic retries:** a slow launch may still succeed, and opening it again would
+  give the session two writers. Recovery is a deliberate manual step.
+- **Small codebase:** `core.ts` handles validation, storage and state changes;
+  `index.ts` handles commands, dialogs and launching. No runtime dependencies, polling
+  or file watchers.
 
-The [simplification decision record](docs/ai/simplification-decisions.md) explains
-which review proposals were implemented or rejected and why. Linux/global-only
-installation and manual reset are settled constraints; no additional cross-project
-claim coordination is planned.
+The [simplification decision record](docs/ai/simplification-decisions.md) lists which
+review suggestions were adopted or rejected, and why.
 
-## Development and testing
+## Behavior and limitations
 
-```bash
+### Recovery
+
+**An opened terminal isn't a restored session.** If the terminal starts but Pi doesn't,
+the entry stays `launching`. To recover:
+
+1. Check the new terminal for a startup or trust dialog.
+2. Use `/restore-status` to see the state path, launch age and command. It shows the
+   _current_ terminal setting, not a history of what was run, so don't run it manually.
+3. Close the related terminal, then pick the entry in `/restore` and confirm the reset.
+4. Run `/restore` again to retry. A reset alone never opens a window.
+
+Missing files or directories cause an error and keep the entry; use `/restore-forget`
+to remove it.
+
+### State and locking
+
+State is stored in `~/.pi/agent/session-restore/saved.json` (or under
+`PI_CODING_AGENT_DIR`), with permissions 0700 for new directories and 0600 for files. If
+a write is interrupted, an empty `write.lock` directory can be left behind. **Make sure
+no save or restore is running**, then remove it with `rmdir`. Never force-remove a lock
+that might be in use. A corrupted state file causes a visible error and is never
+replaced silently.
+
+### Safety
+
+- Close the original Pi instance before restoring its conversation. The extension only
+  coordinates its own restores; it is not a general session lock.
+- With an invalid or expired ticket, the new Pi shuts down. Pi may already have written
+  startup metadata by then.
+- State and diagnostic output contain labels, absolute paths and tickets, so don't
+  publish them. Conversation content is never copied into the state file.
+- A custom terminal prefix runs with your permissions. Only configure executables you
+  trust.
+- Atomic renames prevent half-written JSON, but they are no backup and don't protect
+  against power loss.
+
+## Development
+
+```sh
 npm ci --ignore-scripts
 npm run check
 npm run format:check
 npm run test:integration
 ```
 
-`npm run check` runs strict TypeScript checking and Node's test runner. Native
-TypeScript execution alone does not typecheck the source.
-
-Tests cover concurrent cross-process claims, canonical paths, stale tickets,
-current-session recovery, forgetting, terminal configuration, partial batch
-failure, lock timeout, filesystem failures and cleanup. Filesystem operations
-have a narrow injection seam for deterministic failure tests.
-
-The Python integration test uses only the standard library. It loads the package
-through isolated **global settings**, drives real Pi commands in PTYs, and uses a
-fake terminal to execute the exact generated argv. It also verifies real Pi exits
-on expired and wrong-session tickets. Each scenario has an isolated home/agent
-directory, an allowlisted environment without provider credentials, offline mode,
-and bounded cleanup. No desktop window or model prompt is created.
-
-CI runs these checks on Linux with Node 24 and 26 and the pinned Pi version.
-Before a release, manually verify your preferred desktop terminal using
-[the release checklist](docs/ai/release-checklist.md). Automated PTY tests do not
-verify actual window creation or terminal-server environment behavior.
+Requires Node.js 24+. `check` runs strict TypeScript checking and Node's test runner.
+Unit tests cover concurrent claims across processes, outdated tickets, recovery, lock
+timeouts and injected filesystem failures. The Python integration test (standard library
+only) runs real Pi commands in pseudo-terminals with an isolated home directory, a fake
+terminal and no credentials. CI runs on Linux with Node 24 and 26. Before a release,
+check the result in a real desktop terminal using the
+[release checklist](docs/ai/release-checklist.md).
 
 ## License
 
-[MIT](LICENSE), © 2026 Michael Brunner.
+[MIT](LICENSE) © 2026 Michael Brunner
