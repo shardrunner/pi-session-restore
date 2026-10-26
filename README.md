@@ -1,9 +1,9 @@
 # Pi Session Restore
 
-> **Disclaimer:** This extension is vibe coded for personal use. Use at your own risk.
-
-Bookmark [Pi](https://pi.dev) conversations and reopen them in separate terminal
-windows, with cross-process claim protection and startup acknowledgement.
+Keep a queue of [Pi](https://pi.dev) conversations to reopen later, one per new
+terminal window. Use `/save "Fix login"` to bookmark a conversation and exit,
+then `/restore` from another Pi instance to reopen it. Cross-process claims and
+startup acknowledgement coordinate restore requests.
 
 Pi's `/resume` switches the conversation in the current instance. This extension
 keeps an explicit queue of conversations you want to reopen later, one per new
@@ -190,6 +190,11 @@ The [simplification decision record](docs/ai/simplification-decisions.md) explai
 which review proposals were implemented or rejected and why. Linux/global-only
 installation and manual reset are settled constraints; no additional cross-project
 claim coordination is planned.
+
+## Project status
+
+Developed with AI assistance for personal use. Provided as-is, without support or
+compatibility guarantees. Review the source and documented limitations before use.
 
 ## Development and testing
 
